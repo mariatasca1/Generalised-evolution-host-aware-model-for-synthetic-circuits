@@ -1,22 +1,10 @@
-# Host aware mutation Model Generalised 
-# Here we will employ this model for the repressilator 
 
 # Define construct parameters
 active_dims = [1,0,1,0,1,0];
-d = sum(active_dims); # The number of active dimensions
-num_genes = Int(div(length(active_dims) ,2)); # Number of added genes
+d = sum(active_dims); # The number of active dimensions 
 # Run the set-up file
 # Include the parameter generation file, which defines essential parameters for the simulation
-include("f_params_gen.jl");
-
-base_params = f_params_gen(active_dims);
-length_of_proteins = Vector{Float64}(undef, num_genes);
-num_genes, N, mass, nut, nq, v_e, K_e, n_R, n_Z, n_Q = base_params[1:10];
-num_genes = Int(num_genes);
-length_of_proteins = base_params[11:11 + num_genes - 1];
-v_TX_R, v_TX_Z, v_TX_Q, K_TX_R, K_TX_nR, K_Q, h_Q,
-m_deg, kb_TL, ku_TL, v_TL, K_TL, K_H, h_H, p_deg = base_params[11 + num_genes:end];
-
+include("f_params_3genes.jl");
 
 #Record construct-specific params. Alpha = max. TX strength (a proxy for
 # promoter strength). Beta = mRNA-ribosome binding strength (a proxy for
@@ -39,7 +27,6 @@ beta_M = 0;
 z_M = 1e-6;         # Mutation probabilities for each state
 z_I = 1e-2;
 
-M = [0 0 -1; -1 0 0; 0 -1 0];
 
 # active_dims: vector of logicals relating to the system's parts, in
 # order of "part_matrix" above. 1 = model mutations to that part. 0 = do
@@ -53,18 +40,12 @@ s = 2;
 
 n = s^d; # Number of mutation states in the framework
 
-part_matrix = Array{Float64,2}(undef, 3, Int(2*num_genes) ) # 3 rows, 2*d columns to start
+part_matrix = [alpha_E beta_E alpha_E beta_E alpha_E beta_E;
+               alpha_I beta_I alpha_I beta_I alpha_I beta_I;
+               alpha_M beta_M alpha_M beta_M alpha_M beta_M];
 
-for i in 1:Int(num_genes)
-    part_matrix[:, 2i-1] = [alpha_E; alpha_I; alpha_M] ;  # prom_A
-    part_matrix[:, 2i]   = [beta_E; beta_I; beta_M] ;     # RBS_A
-end
+z_matrix = [z_M z_M z_M z_M z_M z_M; z_I z_I z_I z_I z_I z_I];
 
-z_matrix = Array{Float64,2}(undef, 2, length(active_dims));
-
-for i in 1:(length(active_dims))
-    z_matrix[:, i] = [z_M; z_I];
-end
 
 # Define mutation granularity
 
@@ -86,6 +67,12 @@ state_connections = f_allocate_coords(s, d, n);
 # distribute these across the states in the correct order
 include("f_active_construct_params.jl");
 active_z_matrix, matrix = f_active_construct_params(active_dims, s, d, n, part_matrix, z_matrix);
+alpha_A_vec = matrix[1, :];
+beta_A_vec  = matrix[2, :];
+alpha_B_vec = matrix[3, :];
+beta_B_vec  = matrix[4, :];
+alpha_C_vec = matrix[5, :];
+beta_C_vec  = matrix[6, :];
 
 # The ODE for each state involves terms regarding (i) number of cells in
 # connected upstream states, (ii) mutation probabilities from connected
@@ -94,12 +81,11 @@ active_z_matrix, matrix = f_active_construct_params(active_dims, s, d, n, part_m
 # coded format. Hence, f_extract_state_connections transfers therequired
 # info into defined variables and converts 'coordinates' to numbered
 # indices and 'z_matrix index pairs' into probabilities.
-include("f_coord_converter.jl");
 include("f_extract_state_connections.jl");
 states_up, z_values_up, z_values_dn = f_extract_state_connections(state_connections, active_z_matrix, s, d, n);
 
 # Collate all the parameters in a list
-params = (n, base_params...,matrix);
+params = vcat(n, base_params, alpha_A_vec, beta_A_vec, alpha_B_vec, beta_B_vec, alpha_C_vec, beta_C_vec);
 
 # 4. Initialise variables and call solver
 
@@ -136,12 +122,33 @@ else # Mutations to a different combination of parts
 end
 
 # Assign initial values to starting variables
-var_0 = Float64[]
-subpop_0 = hcat(N, zeros(1, n-1)) # Assume population always starts as all-E-state
-append!(var_0, subpop_0)
-for i in 1:(Int(10 + 3 * num_genes))
-    append!(var_0, ss_store[i, :]);
-end
+subpop_0 = [N zeros(1,n-1)]; # Assume population always starts as all-E-state
+e_0 = ss_store[1,:]; 
+m_R_0 = ss_store[2,:];
+m_Z_0 = ss_store[3,:];
+m_Q_0 = ss_store[4,:];
+m_HA_0 = ss_store[5,:];
+m_HB_0 = ss_store[6,:];
+m_HC_0 = ss_store[7,:];
+TL_R_0 = ss_store[8,:];
+TL_Z_0 = ss_store[9,:];
+TL_Q_0 = ss_store[10,:];
+TL_HA_0 = ss_store[11,:];
+TL_HB_0 = ss_store[12,:];
+TL_HC_0 = ss_store[13,:];
+R_0 = ss_store[14,:];
+Z_0 = ss_store[15,:];
+Q_0 = ss_store[16,:];
+HA_0 = ss_store[17,:];
+HB_0 = ss_store[18,:];
+HC_0 = ss_store[19,:];
+
+# Save initial values as a variable
+var_0 = vcat(vec(subpop_0), vec(e_0), vec(m_R_0), vec(m_Z_0), vec(m_Q_0),
+             vec(m_HA_0), vec(m_HB_0), vec(m_HC_0), vec(TL_R_0), vec(TL_Z_0),
+             vec(TL_Q_0), vec(TL_HA_0), vec(TL_HB_0), vec(TL_HC_0), vec(R_0),
+             vec(Z_0), vec(Q_0), vec(HA_0), vec(HB_0), vec(HC_0))
+
 
 
 #Let's solve it.
@@ -150,51 +157,46 @@ tspan = (0, 1000); # Simulation time range
 using DifferentialEquations
 using Profile
 using ForwardDiff
-include("f_ODEs_generalisation.jl");
 
-parameters_matlab = (params, M, states_up, z_values_up, z_values_dn);
-prob = ODEProblem(f_ODEs_generalisation, var_0, tspan, parameters_matlab)
-sol = solve(prob, FBDF(), abstol = 1e-8, reltol = 1e-8)
-y = sol;
-
-#Not enough time steps, should aim for around 32k
-length(sol.t)           # number of saved steps
-sol.destats.naccept     # accepted internal steps
-sol.destats.nreject     # rejected steps
+include("f_ODEs_3genes_original.jl")
+parameters_matlab = (params, states_up, z_values_up, z_values_dn);
+prob_matlab = ODEProblem(f_ODEs_3genes_original, var_0, tspan, parameters_matlab)
+sol_matlab = solve(prob_matlab, QNDF(), abstol = 1e-8, reltol = 1e-8)
+y = sol_matlab;
 
 #5. Extract variables and calculate any terms required
+x = 1; # Initialise for automatic numbering
+subpop = y[x:x+n-1, :]; x=x+n;
+e = y[x:x+n-1,:]; x=x+n;
+m_R = y[x:x+n-1, :]; x=x+n;
+m_Z = y[x:x+n-1,:]; x=x+n;
+m_Q = y[x:x+n-1,:]; x=x+n;
 
-j = 1; # Initialise for automatic numbering
-subpop = y[j:j+n-1, :]; j=j+n;
-e = y[j:j+n-1,:]; j=j+n;
-m_R = y[j:j+n-1, :]; j=j+n;
-m_Z = y[j:j+n-1,:]; j=j+n;
-m_Q = y[j:j+n-1,:]; j=j+n;
-
+num_genes =  Int(length(active_dims)/2)
 vector_m_HA = Vector{Matrix{Float64}}()
 for i in 1:num_genes
-    push!(vector_m_HA, y[j:j+n-1,:]);
-    j = j+n;
+    push!(vector_m_HA, y[x:x+n-1,:]);
+    x = x+n;
 end
 
-TL_R = y[j:j+n-1,:]; j=j+n;
-TL_Z = y[j:j+n-1,:]; j=j+n;
-TL_Q = y[j:=j+n-1,:]; j=j+n;
+TL_R = y[x:x+n-1,:]; x=x+n;
+TL_Z = y[x:x+n-1,:]; x=x+n;
+TL_Q = y[x:x+n-1,:]; x=x+n;
 
 vector_TL_HA = Vector{Matrix{Float64}}()
 for i in 1:num_genes
-    push!(vector_TL_HA, y[j:x+j-1,:]);
-    j = j+n;
+    push!(vector_TL_HA, y[x:x+n-1,:]);
+    x = x+n;
 end
 
-R = y[j:j+n-1, :]; j=j+n;
-Z = y[j:j+n-1, :]; j=j+n;
-Q = y[j:j+n-1, :]; j=j+n;
+R = y[x:x+n-1, :]; x=x+n;
+Z = y[x:x+n-1, :]; x=x+n;
+Q = y[x:x+n-1, :]; x=x+n;
 
 vector_HA = Vector{Matrix{Float64}}()
 for i in 1:num_genes
-    push!(vector_HA, y[j:j+n-1, :]);
-    j = j+n;
+    push!(vector_HA, y[x:x+n-1, :]);
+    x = x+n;
 end
 
 # Calculate growth rate (note: to analyse more rates, copy the relevant
@@ -205,8 +207,6 @@ for i in 1:Int(num_genes)
     TL_all = TL_all + vector_TL_HA[i];
 end
 GR = TL_rate .* TL_all / mass;
-
-# Let's get plotting!
 
 using Plots
 using Colors
@@ -223,102 +223,35 @@ colors = [
 ]     # dark gray
 
 p = plot(
-    sol.t,                   # x-axis: time
+    sol_matlab.t,                   # x-axis: time
     subpop[1, :],            # y-axis: subpopulation over time
     xlabel = "Time (h)",
     ylabel = "No. cells",
     xlim = (0, 36),
     ylim = (0, 1e9),
     size = (450, 325),
-    label = "Engineered cells", color = colors[1], title = "QNDF", legend = :topleft)
+    label = "Engineered cells", color = colors[1], title = "Solver KenCarp4", legend = :topleft)
 
 
 for i in 2:8
-    plot!(p, sol.t, subpop[i, :], label = "Cell $i", color = colors[i])
+    plot!(p, sol_matlab.t, subpop[i, :], label = "Cell $i", color = colors[i])
 end
 
 display(p)
-#troubleshooting
-#include("f_ODEs_generalisation.jl");
-#du = copy(var_0)
-#answer = f_ODEs_generalisation(du, var_0, parameters_matlab, 0.0) 
+# Optional: Display plot window at specific position (not directly supported in all backends)
+# But plot size and content are handled as above.
 
-#part 2
-#input = rand(160);
-#include("f_ODEs_generalisation.jl");
-#du = copy(input)
-#output = f_ODEs_generalisation(du, input, parameters_matlab, 0.0)
+using SparseConnectivityTracer, ADTypes
+detector = TracerLocalSparsityDetector()
+u0 = copy(var_0)
+du0 = copy(u0)
+t = 0.0;
+jac_sparsity = ADTypes.jacobian_sparsity((du,u) -> f_ODEs_3genes_original(du, u, parameters_matlab, 0.0), du0, u0, detector)
 
-# Jacobian 
-#include("f_ODEs_generalisation.jl");
-#using SparseConnectivityTracer, ADTypes
-#detector = TracerLocalSparsityDetector()
-#u0 = copy(var_0)
-#du0 = copy(u0)
-#t = 0.0;
-#jac_sparsity = ADTypes.jacobian_sparsity((du,u) -> f_ODEs_generalisation(du, u, parameters_matlab, 0.0), du0, u0, detector)
-
-#f = ODEFunction(f_ODEs_generalisation; jac_prototype = float.(jac_sparsity))
-#prob_sparsity = ODEProblem(f, var_0, tspan, parameters_matlab)
-#sol_sparsity = solve(prob_sparsity, QNDF(), reltol = 1e-6, abstol = 1e-6)
-#y_sparsity = sol_sparsity 
-#subpop_sparsity = y_sparsity[1:8, :]
-#e_sparsity = y_sparsity[9:16, :]
-# The results are not right. Using the sparsity jacobian is not a good idea, but at least I was able to identify a mistake by trying to make it work 
-# I rate this idea 7/10
-
-#Sundials package
-#using Sundials
-#sol_sundials = solve(prob,CVODE_Adams())
-
-#Comparing Matlab and Julia
-#function compare_vectors(vec1::Vector{<:Real}, vec2::Vector{<:Real}; tol)
-    n1, n2 = length(vec1), length(vec2)
-    if n1 != n2
-        println("Vectors have different lengths: $n1 vs $n2")
-        return
-    end
-
-    for i in 1:n1
-        diff = abs(vec1[i] - vec2[i])
-        if diff > tol
-            println("Difference at index $i:")
-            println("  vec1 = $(vec1[i])")
-            println("  vec2 = $(vec2[i])")
-            println("  difference = $diff")
-        end
-    end
-    println("Comparison complete.")
-#end
-
-#vector_julia = [1.2902725034509654e8, 4.46214283733591e8, 6.14444712883788e8, 2.1070841602857435e8, 1.9151897996544033e8, 9.058871987347574e8, 1.2987651697666249e8, 9.517223229286844e8, 15201.032192846009, 2951.764058857778, -16924.660886600926, 19934.378292061974, 22659.415783494456, 13660.577539983753, -7042.262825886023, -9603.725107761302, 155.45984876109512, 24.569519541511507, 138.7502301515638, 68.41529426496048, 37.4306901472476, 90.7711646221876, 157.6404992005596, 50.33846933689537, 45.662173710342806, 46.05018263504331, 53.345560011238014, 44.514031891349354, 4.228009398846176, 27.9316901342399, 87.05672527669012, 52.7517418442721, 9564.922035859623, 1305.6666001347385, 8390.907557357588, 4129.40375867028, 1120.5249360888072, 7554.035288627344, 10049.64036660913, 3733.0651737849926, 16773.746385283954, 18.179120694816117, 14643.948179135146, 49.48417184215066, 1952.530283408293, 14.353173275206862, 17681.028512742083, 19.01582705705091, 16793.670910272973, 2338.121508578261, -5.04429448520097, 50.66147839990987, 1967.4567604975923, 13268.631610371613, 54.61683896869991, 6.849264167136074, 16775.80846971628, 2357.2345109746716, 14656.559045684051, 7189.524614635082, 20.543958784871236, 53.605590901701454, 65.01167098206606, 24.718180065141226, -41.60208608355151, -11.62036828762742, -41.79128029124237, -29.000118170255902, -27.47330027636322, -4.7583947435951375, -38.49819852861082, -14.959077484121906, -7.189889740473322, -42.558156847792915, -18.3592887183778, -27.050043817819063, -1.2330573952933386, 3.8255171429575268, -44.074846473123664, -39.329710801523746, -12.48210283236529, 13.22090257235751, -62.607666489886284, -54.239879955216686, -4.105024547486842, -3.5829220974246505, -6.1915921567826695, -55.947967345560386, 5.942662917169156, -23.153487466366787, -18.88679904269747, -53.36454383052728, 12.220686213453524, -18.594473824351386, -41.19982427694065, -20.930584311723198, -16.9422890347895, -15.898608257205616, -0.6025252662823419, -53.192893291816844, -4.82169418238851, -11.061841363571368, -60.261794625462095, -7.070983888933172, 5.317732027717679, -36.79142878985171, -29.385548838756673, -33.33015053551669, -25.88306506603992, -53.630975747328606, -68.91103988338052, -30.442649637447854, 73.7028541606208, 107.95658181088889, 169.55115270809537, 251.0550186485968, 74.40984783920018, 73.60132862949986, 263.1683373548487, 175.48167264005153, 8.583447036675262, 2.9545901510915473, 7.217211325344084, 4.310097978012744, 0.5393748849663949, 0.44463185881085715, 15.242391073867687, 6.762929329972617, 10.59562818577136, 0.63216936986551, 22.059416877277076, 9.382855829799412, 1.2518215537307702, 2.9839199479814926, 6.973842737365781, 9.313132781496906, -0.880690345332102, -1.5805761490188015, 9.097623581594572, 5.360706538688571, -3.9226692705082016, 5.773776405837107, 14.712724089390537, -0.3315118258783274, 10.9458007778083, -2.4415120341040524, 4.697588614482456, 4.91025578543852, -2.5702771910399003, 5.19588082247141, 22.448287103094287, -3.054886663940506, -3.6176130364751637, -0.8576783891088642, 10.539964004020483, 2.760620657231729, -1.5786405880167376, 9.755335225198895, 22.97986435638572, 2.7147092491985045]
-#vector_matlab = [
-#    129027250.345097, 446214283.733591, 614444712.883788, 210708416.028574,
-#    191518979.965440, 905887198.734757, 129876516.976662, 951722322.928684,
-#    15201.032193, 2951.764059, -16924.660887, 19934.378292, 22659.415783,
-#    13660.577540, -7042.262826, -9603.725108, 155.459849, 24.569520,
-##    138.750230, 68.415294, 37.430690, 90.771165, 157.640499, 50.338469,
-#    45.662174, 46.050183, 53.345560, 44.514032, 4.228009, 27.931690,
-#    87.056725, 52.751742, 9564.922036, 1305.666600, 8390.907557, 4129.403759,
-#    1120.524936, 7554.035289, 10049.640367, 3733.065174, 16773.746385,
- #   18.179121, 14643.948179, 49.484172, 1952.530283, 14.353173, 17681.028513,
-#    19.015827, 16793.670910, 2338.121509, -5.044294, 50.661478, 1967.456760,
-#    13268.631610, 54.616839, 6.849264, 16775.808470, 2357.234511, 14656.559046,
-#    7189.524615, 20.543959, 53.605591, 65.011671, 24.718180, -41.602086,
-#    -11.620368, -41.791280, -29.000118, -27.473300, -4.758395, -38.498199,
-#    -14.959077, -7.189890, -42.558157, -18.359289, -27.050044, -1.233057,
-#    3.825517, -44.074846, -39.329711, -12.482103, 13.220903, -62.607666,
-#   -54.239880, -4.105025, -3.582922, -6.191592, -55.947967, 5.942663,
-#    -23.153487, -18.886799, -53.364544, 12.220686, -18.594474, -41.199824,
-#    -20.930584, -16.942289, -15.898608, -0.602525, -53.192893, -4.821694,
-#    -11.061841, -60.261795, -7.070984, 5.317732, -36.791429, -29.385549,
-#    -33.330151, -25.883065, -53.630976, -68.911040, -30.442650, 67.842960,
-#    116.835844, 172.355328, 250.460187, 51.366486, 87.957539, 260.095452,
-#    168.865471, 8.583447, 2.954590, 7.217211, 4.310098, 0.539375, 0.444632,
-#    15.242391, 6.762929, 10.595628, 0.632169, 22.059417, 9.382856, 1.251822,
-#    2.983920, 6.973843, 9.313133, 0.813116, 0.503014, 11.129555, 6.258914,
-#    -0.970374, 7.619362, 17.189653, 2.573014, 14.241583, -2.184725, 7.038944,
-#    5.539678, -0.683098, 8.954874, 26.142618, -2.091777, 0.006048, 2.075809,
-#    10.595944, 3.284888, 0.427198, 12.560523, 23.647256, 5.891675]
-
-#compare_vectors(output, vector_matlab, tol = 1e-8)
+f = ODEFunction(f_ODEs_3genes_original; jac_prototype = float.(jac_sparsity))
+prob_sparsity = ODEProblem(f, var_0, tspan, parameters_matlab)
+sol_sparsity = solve(prob_sparsity, FBDF(), reltol = 1e-6, abstol = 1e-6)
+y_sparsity = sol_sparsity
+subpop_sparsity = y_sparsity[1:8, :]
+e_sparsity = y_sparsity[9:16, :]
+# I am trying to use a sparse jacobian to make the solver faster

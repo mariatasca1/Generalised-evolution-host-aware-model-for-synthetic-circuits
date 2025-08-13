@@ -25,12 +25,14 @@ function f_active_construct_params(active_dims, s, d, n, part_matrix, z_matrix)
 
 # Part strengths
 active_part_matrix = zeros(s,d);
+j = length(active_dims)
 count = 1;
-for i = 1:length(active_dims)
+for i = 1:j
     if active_dims[i] == 1
         if s==1 # Different indexing if all E cells
             active_part_matrix[1,count] = part_matrix[1,i];
         else
+            @show part_matrix[:,i]
             active_part_matrix[1:s,count] = part_matrix[vcat(1:s-1, size(part_matrix,1)), i];
             # E.g. if s=3, parts_mat_all indicies are 1,2,4
         end
@@ -41,7 +43,7 @@ end
 # Mutation probabilities
 active_z_matrix = zeros(s-1,d);
 count = 1;
-for i = 1:length(active_dims)
+for i = 1:j
     if active_dims[i] == 1
         if s == 2
             active_z_matrix[1,count] = z_matrix[1,i];
@@ -61,7 +63,10 @@ parts_combos = zeros(n,d);
 
 for i = 1:d
     # For explanation, see f_allocate_coords.m
+    @show active_part_matrix[1:end, i]
     repeated_elements = repeat(active_part_matrix[1:end, i], inner = s^(i - 1));
+    @show repeated_elements
+    @show s^(d-i)
     parts_combos[:, i] = repeat(repeated_elements, outer = s^(d - i));
 end
 
@@ -81,11 +86,13 @@ num_genes = length(active_dims)/2; # '2': we consider prom/RBS for each gene
 ############ Constructs ##########
 for i in 1: Int(num_genes)
     if active_dims[x] == 1 #Promoter
+        
         alpha_vec = transpose(parts_combos[:,ActiveDim]);
         ActiveDim = ActiveDim  +1;
     else
         alpha_vec = fill(part_matrix[1,x],1 , n);
     end
+    
     matrix[2*i-1, :] = alpha_vec;
     x = x+1;
 

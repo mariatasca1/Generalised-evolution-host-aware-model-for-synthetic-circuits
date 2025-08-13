@@ -27,19 +27,26 @@ for i=1:n
 
     num_up = size(state_connections[i,3], 1);
     num_dn = size(state_connections[i,5], 1);
-    
+    @show num_up num_dn
     # Upstream
     for j = 1:num_up
         
         # States
         coord_up = vec(state_connections[i,3][j]); # Get coord of first upstream state
+        @show coord_up
         idx = f_coord_converter(coord_up, s, d); # What idx is that state?
+        @show idx
         push!(states_up[i], idx);
+        @show states_up
         
         # z: values from state_connections act as indicies for z_mat
         state = state_connections[i,4][j][1];
-        dim = state_connections[i,4][j][2];        
+        @show state
+        dim = state_connections[i,4][j][2];  
+        @show dim      
         push!(z_values_up[i], active_z_matrix[Int(state), Int(dim)]);
+        @show z_values_up
+
     end    
     
     # Downstream
