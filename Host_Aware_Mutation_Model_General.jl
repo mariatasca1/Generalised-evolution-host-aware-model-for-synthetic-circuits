@@ -157,11 +157,6 @@ prob = ODEProblem(f_ODEs_generalisation, var_0, tspan, parameters_matlab)
 sol = solve(prob, FBDF(), abstol = 1e-8, reltol = 1e-8)
 y = sol;
 
-#Not enough time steps, should aim for around 32k
-length(sol.t)           # number of saved steps
-sol.destats.naccept     # accepted internal steps
-sol.destats.nreject     # rejected steps
-
 #5. Extract variables and calculate any terms required
 
 j = 1; # Initialise for automatic numbering
@@ -230,7 +225,7 @@ p = plot(
     xlim = (0, 36),
     ylim = (0, 1e9),
     size = (450, 325),
-    label = "Engineered cells", color = colors[1], title = "QNDF", legend = :topleft)
+    label = "Engineered cells", color = colors[1], title = "FBDF", legend = :topleft)
 
 
 for i in 2:8

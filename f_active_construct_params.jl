@@ -32,7 +32,7 @@ for i = 1:j
         if s==1 # Different indexing if all E cells
             active_part_matrix[1,count] = part_matrix[1,i];
         else
-            @show part_matrix[:,i]
+            #@show part_matrix[:,i]
             active_part_matrix[1:s,count] = part_matrix[vcat(1:s-1, size(part_matrix,1)), i];
             # E.g. if s=3, parts_mat_all indicies are 1,2,4
         end
@@ -63,10 +63,10 @@ parts_combos = zeros(n,d);
 
 for i = 1:d
     # For explanation, see f_allocate_coords.m
-    @show active_part_matrix[1:end, i]
+    #@show active_part_matrix[1:end, i]
     repeated_elements = repeat(active_part_matrix[1:end, i], inner = s^(i - 1));
-    @show repeated_elements
-    @show s^(d-i)
+    #@show repeated_elements
+    #@show s^(d-i)
     parts_combos[:, i] = repeat(repeated_elements, outer = s^(d - i));
 end
 
